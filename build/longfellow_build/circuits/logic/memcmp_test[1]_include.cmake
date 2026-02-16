@@ -1,0 +1,5 @@
+if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/circuits/logic/memcmp_test[1]_tests.cmake")
+  include("/home/keleigh/zkp-service/build/longfellow_build/circuits/logic/memcmp_test[1]_tests.cmake")
+else()
+  add_test(memcmp_test_NOT_BUILT memcmp_test_NOT_BUILT)
+endif()

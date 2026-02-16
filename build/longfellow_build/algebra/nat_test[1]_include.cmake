@@ -1,0 +1,5 @@
+if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/algebra/nat_test[1]_tests.cmake")
+  include("/home/keleigh/zkp-service/build/longfellow_build/algebra/nat_test[1]_tests.cmake")
+else()
+  add_test(nat_test_NOT_BUILT nat_test_NOT_BUILT)
+endif()

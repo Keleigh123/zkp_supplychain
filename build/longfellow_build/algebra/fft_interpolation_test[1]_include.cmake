@@ -1,0 +1,5 @@
+if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/algebra/fft_interpolation_test[1]_tests.cmake")
+  include("/home/keleigh/zkp-service/build/longfellow_build/algebra/fft_interpolation_test[1]_tests.cmake")
+else()
+  add_test(fft_interpolation_test_NOT_BUILT fft_interpolation_test_NOT_BUILT)
+endif()

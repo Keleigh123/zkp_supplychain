@@ -1,0 +1,5 @@
+if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/sumcheck/sumcheck_test[1]_tests.cmake")
+  include("/home/keleigh/zkp-service/build/longfellow_build/sumcheck/sumcheck_test[1]_tests.cmake")
+else()
+  add_test(sumcheck_test_NOT_BUILT sumcheck_test_NOT_BUILT)
+endif()

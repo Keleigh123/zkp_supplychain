@@ -1,0 +1,5 @@
+if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/gf2k/gf2_128_test[1]_tests.cmake")
+  include("/home/keleigh/zkp-service/build/longfellow_build/gf2k/gf2_128_test[1]_tests.cmake")
+else()
+  add_test(gf2_128_test_NOT_BUILT gf2_128_test_NOT_BUILT)
+endif()

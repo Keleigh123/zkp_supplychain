@@ -1,0 +1,5 @@
+if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/sumcheck/quad_test[1]_tests.cmake")
+  include("/home/keleigh/zkp-service/build/longfellow_build/sumcheck/quad_test[1]_tests.cmake")
+else()
+  add_test(quad_test_NOT_BUILT quad_test_NOT_BUILT)
+endif()

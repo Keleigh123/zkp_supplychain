@@ -1,0 +1,7 @@
+add_test([=[Nussbaumer.NegaCyclic]=]  /home/keleigh/zkp-service/build/longfellow_build/algebra/nussbaumer_test [==[--gtest_filter=Nussbaumer.NegaCyclic]==] --gtest_also_run_disabled_tests)
+set_tests_properties([=[Nussbaumer.NegaCyclic]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/algebra SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
+add_test([=[Nussbaumer.Linear]=]  /home/keleigh/zkp-service/build/longfellow_build/algebra/nussbaumer_test [==[--gtest_filter=Nussbaumer.Linear]==] --gtest_also_run_disabled_tests)
+set_tests_properties([=[Nussbaumer.Linear]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/algebra SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
+add_test([=[Nussbaumer.Middle]=]  /home/keleigh/zkp-service/build/longfellow_build/algebra/nussbaumer_test [==[--gtest_filter=Nussbaumer.Middle]==] --gtest_also_run_disabled_tests)
+set_tests_properties([=[Nussbaumer.Middle]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/algebra SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
+set(  nussbaumer_test_TESTS Nussbaumer.NegaCyclic Nussbaumer.Linear Nussbaumer.Middle)

@@ -1,0 +1,5 @@
+if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/circuits/logic/bit_plucker_test[1]_tests.cmake")
+  include("/home/keleigh/zkp-service/build/longfellow_build/circuits/logic/bit_plucker_test[1]_tests.cmake")
+else()
+  add_test(bit_plucker_test_NOT_BUILT bit_plucker_test_NOT_BUILT)
+endif()

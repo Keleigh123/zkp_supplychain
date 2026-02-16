@@ -1,0 +1,5 @@
+if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/circuits/sha3/sha3_circuit_test[1]_tests.cmake")
+  include("/home/keleigh/zkp-service/build/longfellow_build/circuits/sha3/sha3_circuit_test[1]_tests.cmake")
+else()
+  add_test(sha3_circuit_test_NOT_BUILT sha3_circuit_test_NOT_BUILT)
+endif()

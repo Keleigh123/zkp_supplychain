@@ -1,0 +1,1 @@
+/usr/bin/c++ -fsanitize=address -g CMakeFiles/mdoc_zk_test.dir/mdoc_zk_test.cc.o -o mdoc_zk_test  libmdoc_static.a ../../testing/libtesting_main.a -lgtest -lpthread /usr/lib/x86_64-linux-gnu/libbenchmark.so.1.8.3 -lcrypto -lzstd 

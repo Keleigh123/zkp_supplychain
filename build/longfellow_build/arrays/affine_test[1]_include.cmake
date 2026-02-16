@@ -1,0 +1,5 @@
+if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/arrays/affine_test[1]_tests.cmake")
+  include("/home/keleigh/zkp-service/build/longfellow_build/arrays/affine_test[1]_tests.cmake")
+else()
+  add_test(affine_test_NOT_BUILT affine_test_NOT_BUILT)
+endif()

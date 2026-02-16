@@ -1,0 +1,5 @@
+add_test([=[CBOR.VerifyDecode]=]  /home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser/cbor_test [==[--gtest_filter=CBOR.VerifyDecode]==] --gtest_also_run_disabled_tests)
+set_tests_properties([=[CBOR.VerifyDecode]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
+add_test([=[CBOR.VerifyParseSize]=]  /home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser/cbor_test [==[--gtest_filter=CBOR.VerifyParseSize]==] --gtest_also_run_disabled_tests)
+set_tests_properties([=[CBOR.VerifyParseSize]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
+set(  cbor_test_TESTS CBOR.VerifyDecode CBOR.VerifyParseSize)
