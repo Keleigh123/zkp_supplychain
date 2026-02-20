@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser/scan_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser/scan_test[1]_tests.cmake")
-else()
-  add_test(scan_test_NOT_BUILT scan_test_NOT_BUILT)
-endif()

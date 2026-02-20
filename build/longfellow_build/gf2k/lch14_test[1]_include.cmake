@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/gf2k/lch14_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/gf2k/lch14_test[1]_tests.cmake")
-else()
-  add_test(lch14_test_NOT_BUILT lch14_test_NOT_BUILT)
-endif()

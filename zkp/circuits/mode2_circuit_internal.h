@@ -1,21 +1,29 @@
 #pragma once
 
-#include "algebra/fp.h"
-#include "circuit.h" 
-#include "logic.h"
-#include "algebra/fp_p256.h" 
+#include <cstdint>
+#include <cstring>
+#include <vector>
+
+#include "sumcheck/circuit.h"
+#include "algebra/fp_p256.h"
 
 namespace zkp::internal {
 
+// IMPORTANT:
+// proofs::Circuit<Field> is just a POD struct (no field context).
+// So we keep our own Field instance for canonicalize / constants,
+// but the base Circuit does NOT store it.
 class Mode2Circuit final : public proofs::Circuit<proofs::Fp256<>> {
 public:
+  using Field = proofs::Fp256<>;
 
-    Mode2Circuit();
-    // Remove this line - it's causing the issue:
-    // const proofs::Fp<256>& F; 
-    
-    // Add proper field access
-    // const proofs::Fp<256>& field() const { return Circuit<proofs::Fp<256>>::F; }
+  // Used only for building constants (quad coefficients) safely.
+  Field field_;
+
+  Mode2Circuit();
+
+  const Field& field() const { return field_; }
+  Field& field_mut() { return field_; }
 };
 
-} // namespace zkp::internal
+}  // namespace zkp::internal

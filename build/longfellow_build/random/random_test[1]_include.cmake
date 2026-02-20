@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/random/random_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/random/random_test[1]_tests.cmake")
-else()
-  add_test(random_test_NOT_BUILT random_test_NOT_BUILT)
-endif()

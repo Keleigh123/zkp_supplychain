@@ -65,7 +65,7 @@ static void generate_proof_route(const crow::request& req, crow::response& res) 
     input.nonce      = from_base64(body["nonce"].get<std::string>()); //nonce needs to be saved when gen crdential
 
     std::string supplyRequestId = body["supplyRequestId"].get<std::string>();
-
+   std::vector<uint8_t> verifierChainPK = from_base64(body["chainPK"].get<std::string>());
     zkp::PublicInputs pub;
     zkp::Proof proof = zkp::generate_proof(input, pub);
 
@@ -94,6 +94,11 @@ static void generate_proof_route(const crow::request& req, crow::response& res) 
            }
         << "timestamp" << static_cast<int64_t>(input.timestamp)
         << "supplyRequestId" << str2oid(supplyRequestId)
+           << "verifierChainPK" << bsoncxx::types::b_binary{
+               bsoncxx::binary_sub_type::k_binary,
+               static_cast<uint32_t>(verifierChainPK.size()),
+               verifierChainPK.data()
+           }
         << "proof"
         << bsoncxx::types::b_binary{
                bsoncxx::binary_sub_type::k_binary,
@@ -200,7 +205,7 @@ static void verify_proof_route(crow::response& res, std::string id) {
 
     // ----------------- WI signature check -----------------
 
-    auto approved = load_chain_set("approved_set.json");
+    auto approved = load_chain_set("/home/keleigh/zkp-service/approved_set.json");
 
     bool sig_ok = false;
     for (const auto& pk : approved) {
@@ -480,14 +485,17 @@ CROW_ROUTE(app, "/proofs/generate").methods("POST"_method)
 
 
     // 🔟 Get proofs to verify for a chain
-    CROW_ROUTE(app, "/proofstoverify/<string>").methods("GET"_method)
-    ([](const crow::request&, crow::response& res, std::string chainPK_b64){
+   CROW_ROUTE(app, "/proofstoverify").methods("GET"_method)
+([](const crow::request& req, crow::response& res){
+    auto chainPK_b64 = req.url_params.get("chainPK");
+    if (!chainPK_b64) { res.code = 400; res.end("Missing chainPK"); return; }
+
         auto db = Mongo::instance().db();
         auto col = db["zk_proof"];
         std::vector<uint8_t> chainPK = from_base64(chainPK_b64);
 
         bsoncxx::builder::stream::document filter{};
-        filter << "requiredChainPK" << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
+        filter << "verifierChainPK" << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
                                                                static_cast<uint32_t>(chainPK.size()), chainPK.data()}
                << "status" << "GENERATED";
 

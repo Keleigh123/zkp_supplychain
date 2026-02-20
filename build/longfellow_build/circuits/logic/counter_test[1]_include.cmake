@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/circuits/logic/counter_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/circuits/logic/counter_test[1]_tests.cmake")
-else()
-  add_test(counter_test_NOT_BUILT counter_test_NOT_BUILT)
-endif()

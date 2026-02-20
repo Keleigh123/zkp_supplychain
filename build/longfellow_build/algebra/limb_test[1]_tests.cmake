@@ -1,5 +1,0 @@
-add_test([=[Limb.Scalar]=]  /home/keleigh/zkp-service/build/longfellow_build/algebra/limb_test [==[--gtest_filter=Limb.Scalar]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[Limb.Scalar]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/algebra SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-add_test([=[Limb.Array]=]  /home/keleigh/zkp-service/build/longfellow_build/algebra/limb_test [==[--gtest_filter=Limb.Array]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[Limb.Array]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/algebra SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-set(  limb_test_TESTS Limb.Scalar Limb.Array)

@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/algebra/poly_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/algebra/poly_test[1]_tests.cmake")
-else()
-  add_test(poly_test_NOT_BUILT poly_test_NOT_BUILT)
-endif()

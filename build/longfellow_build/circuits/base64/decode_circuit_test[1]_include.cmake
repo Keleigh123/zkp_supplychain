@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/circuits/base64/decode_circuit_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/circuits/base64/decode_circuit_test[1]_tests.cmake")
-else()
-  add_test(decode_circuit_test_NOT_BUILT decode_circuit_test_NOT_BUILT)
-endif()

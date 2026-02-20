@@ -29,7 +29,8 @@ constexpr size_t kLigeroNreq = 1;  // NOT 6
 static constexpr size_t kVersion    = 4;
 
 bool Mode2Verifier::verify(Elt pub, const uint8_t* proof_in, size_t proof_len) {
-  const Field base;
+  const Field& base = c.circuit.field();
+
     const Field2 base2(base);
 
     // Hardcoded or precomputed root for Fp2:

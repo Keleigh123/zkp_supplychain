@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/zk/zk_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/zk/zk_test[1]_tests.cmake")
-else()
-  add_test(zk_test_NOT_BUILT zk_test_NOT_BUILT)
-endif()

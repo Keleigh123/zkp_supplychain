@@ -1,5 +1,0 @@
-add_test([=[Random.FSPRF]=]  /home/keleigh/zkp-service/build/longfellow_build/random/random_test [==[--gtest_filter=Random.FSPRF]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[Random.FSPRF]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/random SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-add_test([=[Random.SecureRandomEngine]=]  /home/keleigh/zkp-service/build/longfellow_build/random/random_test [==[--gtest_filter=Random.SecureRandomEngine]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[Random.SecureRandomEngine]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/random SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-set(  random_test_TESTS Random.FSPRF Random.SecureRandomEngine)

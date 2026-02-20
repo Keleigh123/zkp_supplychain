@@ -1,5 +1,0 @@
-add_test([=[Sha3Reference.TestVec]=]  /home/keleigh/zkp-service/build/longfellow_build/circuits/sha3/sha3_reference_test [==[--gtest_filter=Sha3Reference.TestVec]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[Sha3Reference.TestVec]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/circuits/sha3 SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-add_test([=[Sha3Reference.OneMillionAs]=]  /home/keleigh/zkp-service/build/longfellow_build/circuits/sha3/sha3_reference_test [==[--gtest_filter=Sha3Reference.OneMillionAs]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[Sha3Reference.OneMillionAs]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/circuits/sha3 SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-set(  sha3_reference_test_TESTS Sha3Reference.TestVec Sha3Reference.OneMillionAs)

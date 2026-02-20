@@ -1,5 +1,0 @@
-add_test([=[CborPluck.PluckPrimeField]=]  /home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser/cbor_pluck_test [==[--gtest_filter=CborPluck.PluckPrimeField]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[CborPluck.PluckPrimeField]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-add_test([=[CborPluck.PluckBinaryField]=]  /home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser/cbor_pluck_test [==[--gtest_filter=CborPluck.PluckBinaryField]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[CborPluck.PluckBinaryField]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-set(  cbor_pluck_test_TESTS CborPluck.PluckPrimeField CborPluck.PluckBinaryField)

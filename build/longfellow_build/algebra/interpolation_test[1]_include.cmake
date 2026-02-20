@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/algebra/interpolation_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/algebra/interpolation_test[1]_tests.cmake")
-else()
-  add_test(interpolation_test_NOT_BUILT interpolation_test_NOT_BUILT)
-endif()

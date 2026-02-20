@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/cbor/host_decoder_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/cbor/host_decoder_test[1]_tests.cmake")
-else()
-  add_test(host_decoder_test_NOT_BUILT host_decoder_test_NOT_BUILT)
-endif()

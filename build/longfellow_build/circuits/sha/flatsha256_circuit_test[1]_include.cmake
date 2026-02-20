@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/circuits/sha/flatsha256_circuit_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/circuits/sha/flatsha256_circuit_test[1]_tests.cmake")
-else()
-  add_test(flatsha256_circuit_test_NOT_BUILT flatsha256_circuit_test_NOT_BUILT)
-endif()

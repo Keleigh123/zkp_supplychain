@@ -1,5 +1,0 @@
-add_test([=[HostDecoderTest.DecodeHost]=]  /home/keleigh/zkp-service/build/longfellow_build/cbor/host_decoder_test [==[--gtest_filter=HostDecoderTest.DecodeHost]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[HostDecoderTest.DecodeHost]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/cbor SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-add_test([=[HostDecoderTest.Lookup]=]  /home/keleigh/zkp-service/build/longfellow_build/cbor/host_decoder_test [==[--gtest_filter=HostDecoderTest.Lookup]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[HostDecoderTest.Lookup]=]  PROPERTIES WORKING_DIRECTORY /home/keleigh/zkp-service/build/longfellow_build/cbor SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-set(  host_decoder_test_TESTS HostDecoderTest.DecodeHost HostDecoderTest.Lookup)

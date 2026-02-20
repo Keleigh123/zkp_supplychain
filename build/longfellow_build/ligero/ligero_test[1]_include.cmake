@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/ligero/ligero_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/ligero/ligero_test[1]_tests.cmake")
-else()
-  add_test(ligero_test_NOT_BUILT ligero_test_NOT_BUILT)
-endif()

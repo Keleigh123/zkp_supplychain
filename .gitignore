@@ -1,0 +1,25 @@
+# Build directory
+build/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Compiled objects
+*.o
+*.o.d
+*.a
+*.so
+
+# Binaries
+zkp_service
+
+# VSCode / IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+

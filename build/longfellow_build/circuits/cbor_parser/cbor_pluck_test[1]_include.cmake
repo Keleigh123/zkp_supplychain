@@ -1,5 +1,0 @@
-if(EXISTS "/home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser/cbor_pluck_test[1]_tests.cmake")
-  include("/home/keleigh/zkp-service/build/longfellow_build/circuits/cbor_parser/cbor_pluck_test[1]_tests.cmake")
-else()
-  add_test(cbor_pluck_test_NOT_BUILT cbor_pluck_test_NOT_BUILT)
-endif()
