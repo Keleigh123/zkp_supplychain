@@ -5,7 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
-
+#include "zkp/ecdsa_prover.h"
 #include "db/mongo.h"
 #include "crypto/issuance.h"
 #include "utils/crypto_utils.h"  // for from_base64, base64_encode
@@ -14,7 +14,8 @@
 #include "zkp/verifier.h"
 #include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/builder/stream/helpers.hpp>
-
+#include "utils/ecdsa_check.h"
+#include "zkp/ecdsa_input_check.h"
 
 using json = nlohmann::json;
 
@@ -55,6 +56,98 @@ std::string to_base64(const std::vector<uint8_t>& data) {
 //     vk_cache[circuit_id] = vk;
 //     return vk;
 // }
+
+static void generate_ecdsa_proof_route(const crow::request& req, crow::response& res) {
+    json body = json::parse(req.body);
+
+    zkp::EcdsaProofInput in;
+    in.pkx_32 = from_base64(body["pkx"].get<std::string>());
+    in.pky_32 = from_base64(body["pky"].get<std::string>());
+    in.e_32   = from_base64(body["e"].get<std::string>());
+    in.r_32   = from_base64(body["r"].get<std::string>());
+    in.s_32   = from_base64(body["s"].get<std::string>());
+
+    // Basic sanity
+    auto check32 = [](const std::vector<uint8_t>& v, const char* name) {
+        if (v.size() != 32) throw std::runtime_error(std::string(name) + " must be 32 bytes");
+    };
+    check32(in.pkx_32, "pkx");
+    check32(in.pky_32, "pky");
+    check32(in.e_32,   "e");
+    check32(in.r_32,   "r");
+    check32(in.s_32,   "s");
+
+  // After check32(...) lines:
+
+// --- Normalize endianness (pk/e/r/s) to the first OpenSSL-verifying interpretation ---
+try {
+    auto norm = normalize_ecdsa_inputs_p256(
+        in.pkx_32, in.pky_32, in.e_32, in.r_32, in.s_32
+    );
+
+    std::cerr << "ECDSA normalize: " << norm.note << "\n";
+
+    // overwrite with normalized bytes
+    in.pkx_32 = std::move(norm.pkx);
+    in.pky_32 = std::move(norm.pky);
+    in.e_32   = std::move(norm.e);
+    in.r_32   = std::move(norm.r);
+    in.s_32   = std::move(norm.s);
+} catch (const std::exception& ex) {
+    res.code = 400;
+    res.write(std::string("Bad ECDSA inputs: ") + ex.what());
+    res.end();
+    return;
+}
+
+// Optional extra check (now that we normalized):
+if (!openssl_verify_p256(in.pkx_32, in.pky_32, in.e_32, in.r_32, in.s_32)) {
+    res.code = 400;
+    res.write("OpenSSL verify failed even after normalization");
+    res.end();
+    return;
+}
+
+
+
+    zkp::PublicInputs pub;
+    zkp::Proof proof = zkp::generate_ecdsa_proof(in, pub);
+
+    auto db  = Mongo::instance().db();
+    auto col = db["zk_proof_ecdsa"];
+
+    bsoncxx::builder::stream::document doc{};
+    doc
+      << "pkx" << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
+                                          static_cast<uint32_t>(in.pkx_32.size()),
+                                          in.pkx_32.data()}
+      << "pky" << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
+                                          static_cast<uint32_t>(in.pky_32.size()),
+                                          in.pky_32.data()}
+      << "e"   << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
+                                          static_cast<uint32_t>(in.e_32.size()),
+                                          in.e_32.data()}
+      << "r"   << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
+                                          static_cast<uint32_t>(in.r_32.size()),
+                                          in.r_32.data()}
+      << "s"   << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
+                                          static_cast<uint32_t>(in.s_32.size()),
+                                          in.s_32.data()}
+      << "proof" << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
+                                            static_cast<uint32_t>(proof.data.size()),
+                                            proof.data.data()}
+      << "pub"   << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
+                                            static_cast<uint32_t>(pub.data.size()),
+                                            pub.data.data()}
+      << "status" << "GENERATED";
+
+    col.insert_one(doc.view());
+
+    res.code = 200;
+    res.write("ECDSA ZK proof generated and saved.");
+    res.end();
+}
+
 static void generate_proof_route(const crow::request& req, crow::response& res) {
     json body = json::parse(req.body);
 
@@ -524,6 +617,19 @@ CROW_ROUTE(app, "/proofs/<string>/verify").methods("POST"_method)
     }
 });
 
+CROW_ROUTE(app, "/proofs/generateEcdsa").methods("POST"_method)
+([](const crow::request& req, crow::response& res){
+    try {
+        std::cerr << "About to call generate_ecdsa_proof...\n";
+        generate_ecdsa_proof_route(req, res);
+    } catch (const std::exception& e) {
+        std::cerr << "[generateEcdsa] exception: " << e.what() << "\n";
+        res.code = 400;
+        res.set_header("Content-Type", "text/plain");
+        res.write(std::string("Error: ") + e.what());
+        res.end();
+    }
+});
 
     app.port(8080).multithreaded().run();
 }

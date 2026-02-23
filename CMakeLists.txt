@@ -49,12 +49,19 @@ target_link_libraries(longfellow_static
 )
 
 add_executable(zkp_service
-    main.cpp
+       main.cpp
     crypto/issuance.cpp
+
+    # Mode2 proof system
     zkp/prover.cpp
     zkp/verifier.cpp
     zkp/mode2_circuit.cpp
     zkp/circuits/mode2_circuit_internal.cpp
+
+    # ECDSA proof system
+    zkp/ecdsa_circuit.cpp
+    zkp/ecdsa_prover.cpp
+    utils/ecdsa_check.cpp
 )
 
 target_link_libraries(
@@ -65,6 +72,8 @@ target_link_libraries(
         ${BSONCXX_LIBRARIES}
         pthread
         sodium
+        ssl
+        crypto
 )
 
 
