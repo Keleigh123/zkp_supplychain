@@ -64,6 +64,19 @@ add_executable(zkp_service
     utils/ecdsa_check.cpp
 )
 
+add_executable(merkle_approved_p256
+    tools/merkle_approved_p256.cpp
+)
+
+target_include_directories(merkle_approved_p256 PRIVATE
+    ${CMAKE_SOURCE_DIR}
+)
+
+target_link_libraries(merkle_approved_p256 PRIVATE
+    sodium
+    ssl
+    crypto
+)
 target_link_libraries(
     zkp_service
     PRIVATE

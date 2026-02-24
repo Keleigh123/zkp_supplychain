@@ -502,21 +502,31 @@ bsoncxx::builder::stream::document doc{};
 
         uint64_t ts = body["timestamp"].get<uint64_t>();
 
-        auto cred = issue_credential(supplierPK, chainPK_b64, ts);
+      auto cred = issue_credential_p256(supplierPK, chainPK_b64, ts);
 
-        bsoncxx::builder::stream::document update{};
-        update << "$set" << bsoncxx::builder::stream::open_document
-               << "status" << "ISSUED"
-               << "credential_signature" << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
-                                                                     static_cast<uint32_t>(cred.signature.size()), cred.signature.data()}
-            << "credential_nonce"
+bsoncxx::builder::stream::document update{};
+update << "$set" << bsoncxx::builder::stream::open_document
+       << "status" << "ISSUED"
+       << "credential_r"
+       << bsoncxx::types::b_binary{
+            bsoncxx::binary_sub_type::k_binary,
+            static_cast<uint32_t>(cred.r32.size()),
+            cred.r32.data()
+          }
+       << "credential_s"
+       << bsoncxx::types::b_binary{
+            bsoncxx::binary_sub_type::k_binary,
+            static_cast<uint32_t>(cred.s32.size()),
+            cred.s32.data()
+          }
+       << "credential_nonce"
        << bsoncxx::types::b_binary{
             bsoncxx::binary_sub_type::k_binary,
             static_cast<uint32_t>(cred.nonce.size()),
             cred.nonce.data()
           }
-               << "timestamp" << static_cast<int64_t>(cred.timestamp)
-               << bsoncxx::builder::stream::close_document;
+       << "timestamp" << static_cast<int64_t>(cred.timestamp)
+       << bsoncxx::builder::stream::close_document;
 
        col.update_one(
     bsoncxx::builder::stream::document{} << "_id" << str2oid(id) << bsoncxx::builder::stream::finalize,
@@ -526,44 +536,85 @@ bsoncxx::builder::stream::document doc{};
         res.code = 200; res.end();
     });
 
-    // 8️⃣ Get all issued credentials for a supplier
-    CROW_ROUTE(app, "/allissuedcredentials").methods("GET"_method)
-    ([](const crow::request& req, crow::response& res){
-         auto supplierPK_b64 = req.url_params.get("supplierPK");
-    if (!supplierPK_b64) { 
-        res.code = 400; 
-        res.end("Missing supplierPK"); 
-        return; 
+   
+   // 8️⃣ Get all issued credentials for a supplier
+CROW_ROUTE(app, "/allissuedcredentials").methods("GET"_method)
+([](const crow::request& req, crow::response& res){
+    auto supplierPK_b64 = req.url_params.get("supplierPK");
+    if (!supplierPK_b64) {
+        res.code = 400;
+        res.end("Missing supplierPK");
+        return;
     }
 
     std::vector<uint8_t> supplierPK = from_base64(supplierPK_b64);
-        auto db = Mongo::instance().db();
-        auto col = db["issuecred_requests"];
-        //std::vector<uint8_t> supplierPK = from_base64(supplierPK_b64);
 
-        bsoncxx::builder::stream::document filter{};
-        filter << "supplierPK" << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
-                                                          static_cast<uint32_t>(supplierPK.size()), supplierPK.data()}
-               << "status" << "ISSUED";
+    auto db = Mongo::instance().db();
+    auto col = db["issuecred_requests"];
 
-        json j = json::array();
-        for (auto&& doc : col.find(filter.view())) {
-            json item;
-            item["_id"] = doc["_id"].get_oid().value.to_string();
-            item["timestamp"] = static_cast<int64_t>(doc["timestamp"].get_int64());
-            item["credential_signature"] = to_base64(std::vector<uint8_t>(
-                doc["credential_signature"].get_binary().bytes,
-                doc["credential_signature"].get_binary().bytes + doc["credential_signature"].get_binary().size
+    bsoncxx::builder::stream::document filter{};
+    filter << "supplierPK"
+           << bsoncxx::types::b_binary{
+                bsoncxx::binary_sub_type::k_binary,
+                static_cast<uint32_t>(supplierPK.size()),
+                supplierPK.data()
+              }
+           << "status" << "ISSUED";
+
+    json j = json::array();
+
+    for (auto&& doc : col.find(filter.view())) {
+        json item;
+        item["_id"] = doc["_id"].get_oid().value.to_string();
+        item["timestamp"] = static_cast<int64_t>(doc["timestamp"].get_int64());
+
+        // r (32 bytes)
+        if (doc["credential_r"] && doc["credential_r"].type() == bsoncxx::type::k_binary) {
+            auto bin = doc["credential_r"].get_binary();
+            item["credential_r"] = to_base64(std::vector<uint8_t>(
+                bin.bytes, bin.bytes + bin.size
             ));
-            item["chainPK"] = to_base64(std::vector<uint8_t>(
-                doc["pastChainPK"].get_binary().bytes,
-                doc["pastChainPK"].get_binary().bytes + doc["pastChainPK"].get_binary().size
-            ));
-            j.push_back(item);
+        } else {
+            item["credential_r"] = nullptr;
         }
-        res.write(j.dump()); res.end();
-    });
 
+        // s (32 bytes)
+        if (doc["credential_s"] && doc["credential_s"].type() == bsoncxx::type::k_binary) {
+            auto bin = doc["credential_s"].get_binary();
+            item["credential_s"] = to_base64(std::vector<uint8_t>(
+                bin.bytes, bin.bytes + bin.size
+            ));
+        } else {
+            item["credential_s"] = nullptr;
+        }
+
+        // nonce (32 bytes)
+        if (doc["credential_nonce"] && doc["credential_nonce"].type() == bsoncxx::type::k_binary) {
+            auto bin = doc["credential_nonce"].get_binary();
+            item["credential_nonce"] = to_base64(std::vector<uint8_t>(
+                bin.bytes, bin.bytes + bin.size
+            ));
+        } else {
+            item["credential_nonce"] = nullptr;
+        }
+
+        // chainPK (pastChainPK stored as binary)
+        if (doc["pastChainPK"] && doc["pastChainPK"].type() == bsoncxx::type::k_binary) {
+            auto bin = doc["pastChainPK"].get_binary();
+            item["chainPK"] = to_base64(std::vector<uint8_t>(
+                bin.bytes, bin.bytes + bin.size
+            ));
+        } else {
+            item["chainPK"] = nullptr;
+        }
+
+        j.push_back(std::move(item));
+    }
+
+    res.set_header("Content-Type", "application/json");
+    res.write(j.dump());
+    res.end();
+});
     // 9️⃣ Generate ZK proof
 CROW_ROUTE(app, "/proofs/generate").methods("POST"_method)
 ([&app](const crow::request& req, crow::response& res){
