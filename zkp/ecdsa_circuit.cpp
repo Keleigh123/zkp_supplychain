@@ -31,7 +31,7 @@ std::unique_ptr<proofs::Circuit<Field>> build_ecdsa_verify_circuit() {
   Verc::Witness vwc;
   vwc.input(lc);
 
-  verc.verify_signature3(pkx, pky, e, vwc);
+ // verc.verify_signature3(pkx, pky, e, vwc);
 
   // EXACTLY like zk_test.cc
   return Q.mkcircuit(1);

@@ -57,11 +57,30 @@ add_executable(zkp_service
     zkp/verifier.cpp
     zkp/mode2_circuit.cpp
     zkp/circuits/mode2_circuit_internal.cpp
+   
 
     # ECDSA proof system
     zkp/ecdsa_circuit.cpp
     zkp/ecdsa_prover.cpp
     utils/ecdsa_check.cpp
+
+
+    # NEW step-2 files
+    zkp/ecdsa_merkle_circuit.cpp
+    zkp/ecdsa_merkle_prover.cpp
+    zkp/ecdsa_merkle_verifier.cpp
+)
+
+target_link_libraries(
+    zkp_service
+    PRIVATE
+        longfellow_static
+        ${MONGOCXX_LIBRARIES}
+        ${BSONCXX_LIBRARIES}
+        pthread
+        sodium
+        ssl
+        crypto
 )
 
 add_executable(merkle_approved_p256
@@ -76,17 +95,6 @@ target_link_libraries(merkle_approved_p256 PRIVATE
     sodium
     ssl
     crypto
-)
-target_link_libraries(
-    zkp_service
-    PRIVATE
-        longfellow_static
-        ${MONGOCXX_LIBRARIES}
-        ${BSONCXX_LIBRARIES}
-        pthread
-        sodium
-        ssl
-        crypto
 )
 
 

@@ -45,5 +45,5 @@ Credential issue_credential_p256(
     // (optional) wipe pem string
     sodium_memzero(sk_pem.data(), sk_pem.size());
 
-    return Credential{ std::move(r32), std::move(s32), std::move(nonce), timestamp };
+    return Credential{ std::move(r32), std::move(s32), std::move(nonce),std::move(digest), timestamp };
 }

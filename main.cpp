@@ -16,7 +16,9 @@
 #include <bsoncxx/builder/stream/helpers.hpp>
 #include "utils/ecdsa_check.h"
 #include "zkp/ecdsa_input_check.h"
-
+#include "zkp/ecdsa_merkle_prover.h"
+#include <iostream>
+#include "zkp/ecdsa_merkle_verifier.h"
 using json = nlohmann::json;
 
 // -------------------- Helpers --------------------
@@ -56,6 +58,130 @@ std::string to_base64(const std::vector<uint8_t>& data) {
 //     vk_cache[circuit_id] = vk;
 //     return vk;
 // }
+static void verify_ecdsa_approved_proof_route(const crow::request& req, crow::response& res, std::string id) {
+    auto db = Mongo::instance().db();
+    auto proofCol = db["zk_proof_ecdsa_approved"];
+
+    auto maybeDoc = proofCol.find_one(
+        bsoncxx::builder::stream::document{}
+            << "_id" << str2oid(id)
+            << bsoncxx::builder::stream::finalize
+    );
+
+    if (!maybeDoc) {
+        res.code = 404;
+        res.write("ECDSA approved proof not found");
+        res.end();
+        return;
+    }
+
+    auto doc = maybeDoc->view();
+
+    // Optional verifier authorization check
+    std::vector<uint8_t> callerVerifierPK;
+    bool checkVerifier = false;
+
+    if (!req.body.empty()) {
+        auto body = json::parse(req.body);
+        if (body.contains("verifierPK")) {
+            callerVerifierPK = from_base64(body["verifierPK"].get<std::string>());
+            checkVerifier = true;
+        }
+    }
+
+    if (checkVerifier) {
+        if (!doc["requestedVerifierPK"] || doc["requestedVerifierPK"].type() != bsoncxx::type::k_binary) {
+            res.code = 400;
+            res.write("Stored proof is missing requestedVerifierPK");
+            res.end();
+            return;
+        }
+
+        std::vector<uint8_t> requestedVerifierPK(
+            doc["requestedVerifierPK"].get_binary().bytes,
+            doc["requestedVerifierPK"].get_binary().bytes + doc["requestedVerifierPK"].get_binary().size
+        );
+
+        if (callerVerifierPK != requestedVerifierPK) {
+            res.code = 403;
+            res.write("Verifier public key does not match requested verifier");
+            res.end();
+            return;
+        }
+    }
+
+    if (!doc["proof"] || doc["proof"].type() != bsoncxx::type::k_binary) {
+        res.code = 400;
+        res.write("Stored proof bytes missing");
+        res.end();
+        return;
+    }
+
+    if (!doc["pub"] || doc["pub"].type() != bsoncxx::type::k_binary) {
+        res.code = 400;
+        res.write("Stored public inputs missing");
+        res.end();
+        return;
+    }
+
+    zkp::Proof proof;
+    proof.data.assign(
+        doc["proof"].get_binary().bytes,
+        doc["proof"].get_binary().bytes + doc["proof"].get_binary().size
+    );
+
+    zkp::PublicInputs pub;
+    pub.data.assign(
+        doc["pub"].get_binary().bytes,
+        doc["pub"].get_binary().bytes + doc["pub"].get_binary().size
+    );
+
+    bool ok = zkp::verify_ecdsa_merkle_proof(proof, pub);
+
+    if (!ok) {
+        proofCol.update_one(
+            bsoncxx::builder::stream::document{}
+                << "_id" << str2oid(id)
+                << bsoncxx::builder::stream::finalize,
+            bsoncxx::builder::stream::document{}
+                << "$set" << bsoncxx::builder::stream::open_document
+                << "status" << "INVALID - verification failed"
+                << bsoncxx::builder::stream::close_document
+                << bsoncxx::builder::stream::finalize
+        );
+
+        res.code = 400;
+        res.write("Invalid ECDSA approved ZK proof");
+        res.end();
+        return;
+    }
+
+    proofCol.update_one(
+        bsoncxx::builder::stream::document{}
+            << "_id" << str2oid(id)
+            << bsoncxx::builder::stream::finalize,
+        bsoncxx::builder::stream::document{}
+            << "$set" << bsoncxx::builder::stream::open_document
+            << "status" << "Proof VERIFIED"
+            << bsoncxx::builder::stream::close_document
+            << bsoncxx::builder::stream::finalize
+    );
+
+    json out;
+    out["verified"] = true;
+    out["proofId"] = id;
+
+    // optional fields in response
+    if (doc["supplyRequestId"] && doc["supplyRequestId"].type() == bsoncxx::type::k_oid) {
+        out["supplyRequestId"] = doc["supplyRequestId"].get_oid().value.to_string();
+    }
+
+    res.code = 200;
+    res.set_header("Content-Type", "application/json");
+    res.write(out.dump());
+    res.end();
+}
+
 
 static void generate_ecdsa_proof_route(const crow::request& req, crow::response& res) {
     json body = json::parse(req.body);
@@ -525,6 +651,8 @@ update << "$set" << bsoncxx::builder::stream::open_document
             static_cast<uint32_t>(cred.nonce.size()),
             cred.nonce.data()
           }
+           << "credential_e" << bsoncxx::types::b_binary{ bsoncxx::binary_sub_type::k_binary,   // <--- add
+            static_cast<uint32_t>(cred.e32.size()), cred.e32.data() }    
        << "timestamp" << static_cast<int64_t>(cred.timestamp)
        << bsoncxx::builder::stream::close_document;
 
@@ -682,5 +810,209 @@ CROW_ROUTE(app, "/proofs/generateEcdsa").methods("POST"_method)
     }
 });
 
+CROW_ROUTE(app, "/proofs/generateEcdsaApproved").methods("POST"_method)
+([](const crow::request& req, crow::response& res){
+  try {
+    auto body = json::parse(req.body);
+
+    auto require = [&](const char* k) {
+      if (!body.contains(k)) throw std::runtime_error(std::string("missing key: ") + k);
+    };
+
+    require("approved_root");
+    require("pkx");
+    require("pky");
+    require("e");
+    require("r");
+    require("s");
+    require("path_dirs");
+    require("path_siblings");
+    require("requestedVerifierPK");
+
+    zkp::EcdsaMerkleProofInput in;
+    in.approved_root_32 = from_base64(body["approved_root"].get<std::string>());
+    in.pkx_32 = from_base64(body["pkx"].get<std::string>());
+    in.pky_32 = from_base64(body["pky"].get<std::string>());
+    in.e_32   = from_base64(body["e"].get<std::string>());
+    in.r_32   = from_base64(body["r"].get<std::string>());
+    in.s_32   = from_base64(body["s"].get<std::string>());
+
+    try {
+      auto norm = normalize_ecdsa_inputs_p256(
+          in.pkx_32, in.pky_32, in.e_32, in.r_32, in.s_32
+      );
+      std::cerr << "ECDSA normalize(approved): " << norm.note << "\n";
+
+      in.pkx_32 = std::move(norm.pkx);
+      in.pky_32 = std::move(norm.pky);
+      in.e_32   = std::move(norm.e);
+      in.r_32   = std::move(norm.r);
+      in.s_32   = std::move(norm.s);
+    } catch (const std::exception& ex) {
+      res.code = 400;
+      res.write(std::string("Bad ECDSA inputs: ") + ex.what());
+      res.end();
+      return;
+    }
+
+    if (!openssl_verify_p256(in.pkx_32, in.pky_32, in.e_32, in.r_32, in.s_32)) {
+      res.code = 400;
+      res.write("OpenSSL verify failed even after normalization");
+      res.end();
+      return;
+    }
+
+    in.dirs = body["path_dirs"].get<std::vector<uint8_t>>();
+    auto sibs = body["path_siblings"].get<std::vector<std::string>>();
+
+    if (in.dirs.empty()) throw std::runtime_error("path_dirs is empty");
+    if (sibs.empty())    throw std::runtime_error("path_siblings is empty");
+
+    in.siblings_32.clear();
+    for (auto& s : sibs) in.siblings_32.push_back(from_base64(s));
+
+    zkp::PublicInputs pub;
+    std::cerr << "sizes: root=" << in.approved_root_32.size()
+              << " pkx=" << in.pkx_32.size()
+              << " pky=" << in.pky_32.size()
+              << " e=" << in.e_32.size()
+              << " r=" << in.r_32.size()
+              << " s=" << in.s_32.size()
+              << " siblings=" << in.siblings_32.size()
+              << " dirs=" << in.dirs.size()
+              << "\n";
+
+    for (size_t i = 0; i < in.siblings_32.size(); i++) {
+      std::cerr << " sibling[" << i << "] size=" << in.siblings_32[i].size() << "\n";
+    }
+
+    zkp::Proof proof = zkp::generate_ecdsa_merkle_proof(in, pub);
+
+    auto db  = Mongo::instance().db();
+    auto col = db["zk_proof_ecdsa_approved"];
+
+    const std::string hardcodedSupplyId = "66b123456789abcdef123456";
+    std::vector<uint8_t> requestedVerifierPK =
+        from_base64(body["requestedVerifierPK"].get<std::string>());
+
+    bsoncxx::builder::stream::document doc{};
+
+    doc
+      << "approved_root" << bsoncxx::types::b_binary{
+            bsoncxx::binary_sub_type::k_binary,
+            static_cast<uint32_t>(in.approved_root_32.size()),
+            in.approved_root_32.data()
+         }
+      << "pkx" << bsoncxx::types::b_binary{
+            bsoncxx::binary_sub_type::k_binary,
+            static_cast<uint32_t>(in.pkx_32.size()),
+            in.pkx_32.data()
+         }
+      << "pky" << bsoncxx::types::b_binary{
+            bsoncxx::binary_sub_type::k_binary,
+            static_cast<uint32_t>(in.pky_32.size()),
+            in.pky_32.data()
+         }
+      << "e" << bsoncxx::types::b_binary{
+            bsoncxx::binary_sub_type::k_binary,
+            static_cast<uint32_t>(in.e_32.size()),
+            in.e_32.data()
+         }
+      << "r" << bsoncxx::types::b_binary{
+            bsoncxx::binary_sub_type::k_binary,
+            static_cast<uint32_t>(in.r_32.size()),
+            in.r_32.data()
+         }
+      << "s" << bsoncxx::types::b_binary{
+            bsoncxx::binary_sub_type::k_binary,
+            static_cast<uint32_t>(in.s_32.size()),
+            in.s_32.data()
+         }
+
+      << "sizes" << bsoncxx::builder::stream::open_document
+          << "pkx"      << static_cast<int32_t>(in.pkx_32.size())
+          << "pky"      << static_cast<int32_t>(in.pky_32.size())
+          << "e"        << static_cast<int32_t>(in.e_32.size())
+          << "r"        << static_cast<int32_t>(in.r_32.size())
+          << "s"        << static_cast<int32_t>(in.s_32.size())
+          << "siblings" << static_cast<int32_t>(in.siblings_32.size())
+          << "dirs"     << static_cast<int32_t>(in.dirs.size())
+      << bsoncxx::builder::stream::close_document
+
+      << "supplyRequestId" << str2oid(hardcodedSupplyId)
+      << "status" << "ISSUED"
+      << "requestedVerifierPK" << bsoncxx::types::b_binary{
+            bsoncxx::binary_sub_type::k_binary,
+            static_cast<uint32_t>(requestedVerifierPK.size()),
+            requestedVerifierPK.data()
+         }
+      << "pub" << bsoncxx::types::b_binary{
+            bsoncxx::binary_sub_type::k_binary,
+            static_cast<uint32_t>(pub.data.size()),
+            pub.data.data()
+         }
+      << "proof" << bsoncxx::types::b_binary{
+            bsoncxx::binary_sub_type::k_binary,
+            static_cast<uint32_t>(proof.data.size()),
+            proof.data.data()
+         };
+
+    // path_dirs array
+    {
+      auto arr = doc << "path_dirs" << bsoncxx::builder::stream::open_array;
+      for (auto d : in.dirs) {
+        arr << static_cast<int32_t>(d);
+      }
+      arr << bsoncxx::builder::stream::close_array;
+    }
+
+    // path_siblings array
+    {
+      auto arr = doc << "path_siblings" << bsoncxx::builder::stream::open_array;
+      for (const auto& sib : in.siblings_32) {
+        arr << bsoncxx::types::b_binary{
+          bsoncxx::binary_sub_type::k_binary,
+          static_cast<uint32_t>(sib.size()),
+          sib.data()
+        };
+      }
+      arr << bsoncxx::builder::stream::close_array;
+    }
+
+    auto result = col.insert_one(doc.view());
+
+    json out;
+    out["message"] = "ECDSA approved proof generated and saved";
+    out["proof"]   = to_base64(proof.data);
+    out["pub"]     = to_base64(pub.data);
+
+    if (result && result->inserted_id().type() == bsoncxx::type::k_oid) {
+      out["proofId"] = result->inserted_id().get_oid().value.to_string();
+    }
+
+    res.code = 200;
+    res.set_header("Content-Type", "application/json");
+    res.write(out.dump());
+    res.end();
+
+  } catch (const std::exception& e) {
+    std::cerr << "generateEcdsaApproved exception: " << e.what() << "\n";
+    std::cerr << "request body: " << req.body << "\n";
+    res.code = 400;
+    res.write(std::string("Error: ") + e.what());
+    res.end();
+  }
+});
+
+CROW_ROUTE(app, "/proofs/ecdsaApproved/<string>/verify").methods("POST"_method)
+([](const crow::request& req, crow::response& res, std::string id){
+    try {
+        verify_ecdsa_approved_proof_route(req, res, id);
+    } catch (const std::exception& e) {
+        res.code = 400;
+        res.write(std::string("Error: ") + e.what());
+        res.end();
+    }
+});
     app.port(8080).multithreaded().run();
 }
