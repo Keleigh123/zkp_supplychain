@@ -61,6 +61,7 @@ std::string to_base64(const std::vector<uint8_t>& data) {
 static void verify_ecdsa_approved_proof_route(const crow::request& req, crow::response& res, std::string id) {
     auto db = Mongo::instance().db();
     auto proofCol = db["zk_proof_ecdsa_approved"];
+    auto supplyReqCol = db["supply_requests"];
 
     auto maybeDoc = proofCol.find_one(
         bsoncxx::builder::stream::document{}
@@ -166,7 +167,20 @@ static void verify_ecdsa_approved_proof_route(const crow::request& req, crow::re
             << bsoncxx::builder::stream::close_document
             << bsoncxx::builder::stream::finalize
     );
+      if (doc["supplyRequestId"] && doc["supplyRequestId"].type() == bsoncxx::type::k_oid) {
+        auto supplyRequestOid = doc["supplyRequestId"].get_oid().value;
 
+        supplyReqCol.update_one(
+            bsoncxx::builder::stream::document{}
+                << "_id" << supplyRequestOid
+                << bsoncxx::builder::stream::finalize,
+            bsoncxx::builder::stream::document{}
+                << "$set" << bsoncxx::builder::stream::open_document
+                << "status" << "ACKNOWLEDGED"
+                << bsoncxx::builder::stream::close_document
+                << bsoncxx::builder::stream::finalize
+        );
+    }
     json out;
     out["verified"] = true;
     out["proofId"] = id;
@@ -518,10 +532,13 @@ bsoncxx::builder::stream::document doc{};
 ([](const crow::request& req, crow::response& res){
     auto chainPK_b64 = req.url_params.get("chainPK");
     if (!chainPK_b64) { res.code = 400; res.end("Missing chainPK"); return; }
+std::string chainPK_b64_str = chainPK_b64;
+    std::replace(chainPK_b64_str.begin(), chainPK_b64_str.end(), ' ', '+');
+
 
     auto db = Mongo::instance().db();
     auto col = db["supply_requests"];
-    std::vector<uint8_t> chainPK = from_base64(chainPK_b64);
+    std::vector<uint8_t> chainPK = from_base64(chainPK_b64_str);
 
     bsoncxx::builder::stream::document filter{};
     filter << "targetChainPK" << bsoncxx::types::b_binary{
@@ -592,9 +609,11 @@ bsoncxx::builder::stream::document doc{};
         res.end("Missing chainPK");
         return;
     }
+    std::string chainPK_b64_str = chainPK_b64;
+    std::replace(chainPK_b64_str.begin(), chainPK_b64_str.end(), ' ', '+');
         auto db = Mongo::instance().db();
         auto col = db["issuecred_requests"];
-        std::vector<uint8_t> chainPK = from_base64(chainPK_b64);
+        std::vector<uint8_t> chainPK = from_base64(chainPK_b64_str);
 
         bsoncxx::builder::stream::document filter{};
         filter << "pastChainPK" << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
@@ -674,8 +693,9 @@ CROW_ROUTE(app, "/allissuedcredentials").methods("GET"_method)
         res.end("Missing supplierPK");
         return;
     }
-
-    std::vector<uint8_t> supplierPK = from_base64(supplierPK_b64);
+    std::string supplierPK_b64_str = supplierPK_b64;
+    std::replace(supplierPK_b64_str.begin(), supplierPK_b64_str.end(), ' ', '+');
+    std::vector<uint8_t> supplierPK = from_base64(supplierPK_b64_str);
 
     auto db = Mongo::instance().db();
     auto col = db["issuecred_requests"];
@@ -726,6 +746,16 @@ CROW_ROUTE(app, "/allissuedcredentials").methods("GET"_method)
             item["credential_nonce"] = nullptr;
         }
 
+        //e digest
+          if (doc["credential_e"] && doc["credential_e"].type() == bsoncxx::type::k_binary) {
+            auto bin = doc["credential_e"].get_binary();
+            item["credential_e"] = to_base64(std::vector<uint8_t>(
+                bin.bytes, bin.bytes + bin.size
+            ));
+        } else {
+            item["credential_e"] = nullptr;
+        }
+
         // chainPK (pastChainPK stored as binary)
         if (doc["pastChainPK"] && doc["pastChainPK"].type() == bsoncxx::type::k_binary) {
             auto bin = doc["pastChainPK"].get_binary();
@@ -757,33 +787,86 @@ CROW_ROUTE(app, "/proofs/generate").methods("POST"_method)
 
 
     // 🔟 Get proofs to verify for a chain
-   CROW_ROUTE(app, "/proofstoverify").methods("GET"_method)
+  #include <algorithm>
+#include <iostream>
+
+CROW_ROUTE(app, "/proofstoverify").methods("GET"_method)
 ([](const crow::request& req, crow::response& res){
-    auto chainPK_b64 = req.url_params.get("chainPK");
-    if (!chainPK_b64) { res.code = 400; res.end("Missing chainPK"); return; }
+    try {
+        auto chainPK_b64 = req.url_params.get("chainPK");
+        if (!chainPK_b64) {
+            res.code = 400;
+            res.end("Missing chainPK");
+            return;
+        }
+
+        std::string chainPK_b64_str = chainPK_b64;
+        std::replace(chainPK_b64_str.begin(), chainPK_b64_str.end(), ' ', '+');
 
         auto db = Mongo::instance().db();
-        auto col = db["zk_proof"];
-        std::vector<uint8_t> chainPK = from_base64(chainPK_b64);
+        auto col = db["zk_proof_ecdsa_approved"];
+
+        std::vector<uint8_t> chainPK = from_base64(chainPK_b64_str);
 
         bsoncxx::builder::stream::document filter{};
-        filter << "verifierChainPK" << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary,
-                                                               static_cast<uint32_t>(chainPK.size()), chainPK.data()}
-               << "status" << "GENERATED";
+        filter << "requestedVerifierPK" << bsoncxx::types::b_binary{
+                    bsoncxx::binary_sub_type::k_binary,
+                    static_cast<uint32_t>(chainPK.size()),
+                    chainPK.data()
+                 }
+               << "status" << "ISSUED";
 
         json j = json::array();
+
         for (auto&& doc : col.find(filter.view())) {
             json item;
-            item["_id"] = doc["_id"].get_oid().value.to_string();
-            item["supplierPK"] = to_base64(std::vector<uint8_t>(
-                doc["supplierPK"].get_binary().bytes,
-                doc["supplierPK"].get_binary().bytes + doc["supplierPK"].get_binary().size
-            ));
+
+            if (doc["_id"] && doc["_id"].type() == bsoncxx::type::k_oid) {
+                item["_id"] = doc["_id"].get_oid().value.to_string();
+            }
+
+            if (doc["supplyRequestId"] && doc["supplyRequestId"].type() == bsoncxx::type::k_binary) {
+                auto bin = doc["supplyRequestId"].get_binary();
+                item["supplyRequestId"] = to_base64(std::vector<uint8_t>(
+                    bin.bytes,
+                    bin.bytes + bin.size
+                )); } else {
+                item["supplyRequestId"] = nullptr;
+            }
+
+            if (doc["proof"] && doc["proof"].type() == bsoncxx::type::k_binary) {
+                auto bin = doc["proof"].get_binary();
+                item["proof"] = to_base64(std::vector<uint8_t>(
+                    bin.bytes,
+                    bin.bytes + bin.size
+                ));
+            } else {
+                item["proof"] = nullptr;
+            }
+
+            if (doc["pub"] && doc["pub"].type() == bsoncxx::type::k_binary) {
+                auto bin = doc["pub"].get_binary();
+                item["pub"] = to_base64(std::vector<uint8_t>(
+                    bin.bytes,
+                    bin.bytes + bin.size
+                ));
+            } else {
+                item["pub"] = nullptr;
+            }
+
             j.push_back(item);
         }
-        res.write(j.dump()); res.end();
-    });
 
+        res.code = 200;
+        res.set_header("Content-Type", "application/json");
+        res.write(j.dump());
+        res.end();
+    } catch (const std::exception& e) {
+        std::cerr << "Error in /proofstoverify: " << e.what() << "\n";
+        res.code = 500;
+        res.end(std::string("Internal server error: ") + e.what());
+    }
+});
     // 1️⃣1️⃣ Verify a proof
 CROW_ROUTE(app, "/proofs/<string>/verify").methods("POST"_method)
 ([&app](const crow::request&, crow::response& res, std::string id){
@@ -828,6 +911,8 @@ CROW_ROUTE(app, "/proofs/generateEcdsaApproved").methods("POST"_method)
     require("path_dirs");
     require("path_siblings");
     require("requestedVerifierPK");
+    require("supplyRequestId");
+
 
     zkp::EcdsaMerkleProofInput in;
     in.approved_root_32 = from_base64(body["approved_root"].get<std::string>());
@@ -891,9 +976,12 @@ CROW_ROUTE(app, "/proofs/generateEcdsaApproved").methods("POST"_method)
     auto db  = Mongo::instance().db();
     auto col = db["zk_proof_ecdsa_approved"];
 
-    const std::string hardcodedSupplyId = "66b123456789abcdef123456";
+   
     std::vector<uint8_t> requestedVerifierPK =
         from_base64(body["requestedVerifierPK"].get<std::string>());
+    std::string supplyRequestIdStr =
+    body["supplyRequestId"].get<std::string>();
+    bsoncxx::oid supplyRequestOid(supplyRequestIdStr);
 
     bsoncxx::builder::stream::document doc{};
 
@@ -939,7 +1027,7 @@ CROW_ROUTE(app, "/proofs/generateEcdsaApproved").methods("POST"_method)
           << "dirs"     << static_cast<int32_t>(in.dirs.size())
       << bsoncxx::builder::stream::close_document
 
-      << "supplyRequestId" << str2oid(hardcodedSupplyId)
+     << "supplyRequestId" << supplyRequestOid
       << "status" << "ISSUED"
       << "requestedVerifierPK" << bsoncxx::types::b_binary{
             bsoncxx::binary_sub_type::k_binary,
