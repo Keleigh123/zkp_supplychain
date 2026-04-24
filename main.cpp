@@ -492,13 +492,31 @@ static void verify_proof_route(crow::response& res, std::string id) {
     res.end();
 }
 
+void add_cors(crow::response& res) {
+     res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.set_header("Access-Control-Allow-Headers", "*");
+}
+
 // -------------------- Main --------------------
 int main() {
     crow::SimpleApp app;
+CROW_ROUTE(app, "/<string>").methods("OPTIONS"_method)
+([](const crow::request&, crow::response& res, std::string){
+    std::cout << "GLOBAL OPTIONS HIT\n";
+
+    res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.set_header("Access-Control-Allow-Headers", "*");
+
+    res.code = 204;
+    res.end();
+});
 
     // 1️⃣ Get approved chains
     CROW_ROUTE(app, "/approvedChains").methods("GET"_method)
     ([](const crow::request&, crow::response& res){
+        add_cors(res);
         auto approved = load_chain_set("/home/keleigh/zkp-service/approved_set.json");
         json j = json::array();
         for (auto& pk : approved) j.push_back(to_base64(pk));
@@ -508,7 +526,10 @@ int main() {
 
     // 2️⃣ Supplier submits a supply request
     CROW_ROUTE(app, "/supplyRequests").methods("POST"_method)
-    ([](const crow::request& req, crow::response& res){
+  ([](const crow::request& req, crow::response& res){
+    add_cors(res);
+
+
         auto body = json::parse(req.body);
         auto db = Mongo::instance().db();
         auto col = db["supply_requests"];
@@ -525,11 +546,16 @@ bsoncxx::builder::stream::document doc{};
             << "status" << "PENDING";
 
         col.insert_one(doc.view());
-        res.code = 200; res.end();
+        res.set_header("Content-Type", "application/json");
+res.write("{\"success\": true}");
+res.end();
+        
     });
 
     CROW_ROUTE(app, "/supplyRequests/pending").methods("GET"_method)
 ([](const crow::request& req, crow::response& res){
+    add_cors(res);
+
     auto chainPK_b64 = req.url_params.get("chainPK");
     if (!chainPK_b64) { res.code = 400; res.end("Missing chainPK"); return; }
 std::string chainPK_b64_str = chainPK_b64;
@@ -564,6 +590,7 @@ std::string chainPK_b64_str = chainPK_b64;
     // 4️⃣ Mark supply request as proof requested
     CROW_ROUTE(app, "/supplyRequests/<string>/requestProof").methods("PUT"_method)
     ([](const crow::request&, crow::response& res, std::string id){
+        add_cors(res);
         auto db = Mongo::instance().db();
         auto col = db["supply_requests"];
 
@@ -581,6 +608,7 @@ std::string chainPK_b64_str = chainPK_b64;
     // 5️⃣ Supplier requests a credential
     CROW_ROUTE(app, "/credentials/request").methods("POST"_method)
     ([](const crow::request& req, crow::response& res){
+        add_cors(res);
         auto body = json::parse(req.body);
         auto db = Mongo::instance().db();
         auto col = db["issuecred_requests"];
@@ -603,6 +631,7 @@ bsoncxx::builder::stream::document doc{};
     // 6️⃣ Get pending credential requests for a chain
    CROW_ROUTE(app, "/credissueRequests/pending").methods("GET"_method)
 ([](const crow::request& req, crow::response& res){
+    add_cors(res);
     auto chainPK_b64 = req.url_params.get("chainPK");
     if (!chainPK_b64) {
         res.code = 400;
@@ -637,6 +666,7 @@ bsoncxx::builder::stream::document doc{};
     // 7️⃣ Chain issues a credential
     CROW_ROUTE(app, "/credentials/issue/<string>").methods("PUT"_method)
     ([](const crow::request& req, crow::response& res, std::string id){
+        add_cors(res);
         auto db = Mongo::instance().db();
         auto col = db["issuecred_requests"];
         auto body = json::parse(req.body);
@@ -687,6 +717,7 @@ update << "$set" << bsoncxx::builder::stream::open_document
    // 8️⃣ Get all issued credentials for a supplier
 CROW_ROUTE(app, "/allissuedcredentials").methods("GET"_method)
 ([](const crow::request& req, crow::response& res){
+    add_cors(res);
     auto supplierPK_b64 = req.url_params.get("supplierPK");
     if (!supplierPK_b64) {
         res.code = 400;
@@ -776,6 +807,7 @@ CROW_ROUTE(app, "/allissuedcredentials").methods("GET"_method)
     // 9️⃣ Generate ZK proof
 CROW_ROUTE(app, "/proofs/generate").methods("POST"_method)
 ([&app](const crow::request& req, crow::response& res){
+    add_cors(res);
     try {
         generate_proof_route(req, res);  // No app needed here
     } catch (const std::exception& e) {
@@ -792,6 +824,7 @@ CROW_ROUTE(app, "/proofs/generate").methods("POST"_method)
 
 CROW_ROUTE(app, "/proofstoverify").methods("GET"_method)
 ([](const crow::request& req, crow::response& res){
+    add_cors(res);
     try {
         auto chainPK_b64 = req.url_params.get("chainPK");
         if (!chainPK_b64) {
@@ -870,6 +903,7 @@ CROW_ROUTE(app, "/proofstoverify").methods("GET"_method)
     // 1️⃣1️⃣ Verify a proof
 CROW_ROUTE(app, "/proofs/<string>/verify").methods("POST"_method)
 ([&app](const crow::request&, crow::response& res, std::string id){
+    add_cors(res);
     try {
         verify_proof_route(res, id);  // ✅ Now app is captured by reference
     } catch (const std::exception& e) {
@@ -881,6 +915,7 @@ CROW_ROUTE(app, "/proofs/<string>/verify").methods("POST"_method)
 
 CROW_ROUTE(app, "/proofs/generateEcdsa").methods("POST"_method)
 ([](const crow::request& req, crow::response& res){
+    add_cors(res);
     try {
         std::cerr << "About to call generate_ecdsa_proof...\n";
         generate_ecdsa_proof_route(req, res);
@@ -895,6 +930,7 @@ CROW_ROUTE(app, "/proofs/generateEcdsa").methods("POST"_method)
 
 CROW_ROUTE(app, "/proofs/generateEcdsaApproved").methods("POST"_method)
 ([](const crow::request& req, crow::response& res){
+    add_cors(res);
   try {
     auto body = json::parse(req.body);
 
@@ -1094,6 +1130,7 @@ CROW_ROUTE(app, "/proofs/generateEcdsaApproved").methods("POST"_method)
 
 CROW_ROUTE(app, "/proofs/ecdsaApproved/<string>/verify").methods("POST"_method)
 ([](const crow::request& req, crow::response& res, std::string id){
+    add_cors(res);
     try {
         verify_ecdsa_approved_proof_route(req, res, id);
     } catch (const std::exception& e) {
